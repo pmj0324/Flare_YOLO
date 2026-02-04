@@ -11,3 +11,6 @@ venv/
 runs/
 outputs/
 datasets/
+
+# Ultralytics가 다운로드한 pretrained 가중치 (yolo8l.pt 등)
+*.pt

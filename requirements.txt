@@ -1,2 +1,9 @@
+# YOLO 학습 (5_train.py) — PyTorch 계열은 용량·CUDA 버전 이슈로
+# 필요 시 https://pytorch.org 에서 설치 후 pip install -r requirements.txt
+torch>=2.0
+torchvision>=0.15
+ultralytics-thop>=2.0.18
+
 Pillow>=10
+PyYAML>=6
 ultralytics>=8.0

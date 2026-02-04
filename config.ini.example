@@ -2,8 +2,8 @@
 ; 이 파일을 config.ini로 복사 후 경로를 수정하여 사용
 
 [Model]
-; 사용할 모델 가중치 (yolo8m, yolo8l, yolo11m, yolo11l, -seg 등)
-weight = yolo11s.pt
+; 사용할 모델 가중치 (yolo8n, yolo8s, yolo8m, yolo8l, yolo8x, -seg 등)
+weight = yolo8l.pt
 
 [Data]
 ; 데이터셋 yaml 파일의 절대 경로 또는 상대 경로
@@ -21,5 +21,6 @@ device = 0
 workers = 8
 
 [Output]
+; 저장 경로: 아래 두 개만 쓰면 됨. 결과는 모두 {project_path}/{run_name}/ 아래에 저장됨
 project_path = runs/detect
 run_name = trained_model

@@ -49,12 +49,17 @@ python scripts/4_verify.py --labels_dir datasets/yolo/labels/train --images_dir 
 
 ### 5. 학습
 ```bash
-python scripts/5_train.py --data datasets/yolo/data.yaml --weight yolo11m.pt
+python scripts/5_train.py --data datasets/yolo/data.yaml --weight yolo8l.pt
 ```
 
-또는 config.ini 사용:
+또는 config.ini 사용 (출력 경로·지표 저장 위치 지정 가능):
 ```bash
 cp config.ini.example config.ini
-# config.ini 수정 후
+# config.ini 수정 후 (project_path, run_name, metrics_file, val_vis_dir 등)
 python scripts/5_train.py --config config.ini
 ```
+
+학습 종료 후 자동으로:
+- **성능 지표**가 터미널에 출력되고 `metrics_file`(기본: `{project_path}/{run_name}/metrics.txt`)에 저장됩니다.
+- **Val 비교 이미지**가 `val_vis_dir`(기본: `{project_path}/{run_name}/val_vis`)에 저장됩니다.  
+  빨간 박스 = 실제(GT), 파란 박스 = 예측.
