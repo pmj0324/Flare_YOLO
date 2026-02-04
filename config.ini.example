@@ -1,0 +1,25 @@
+; 학습.pdf ToDo - YOLO 학습 설정 (config.ini)
+; 이 파일을 config.ini로 복사 후 경로를 수정하여 사용
+
+[Model]
+; 사용할 모델 가중치 (yolo8m, yolo8l, yolo11m, yolo11l, -seg 등)
+weight = yolo11s.pt
+
+[Data]
+; 데이터셋 yaml 파일의 절대 경로 또는 상대 경로
+yaml_path = datasets/yolo/data.yaml
+
+[Training]
+epochs = 100
+imgsz = 640
+batch = 16
+patience = 50
+rect = yes
+
+[System]
+device = 0
+workers = 8
+
+[Output]
+project_path = runs/detect
+run_name = trained_model

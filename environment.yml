@@ -1,0 +1,9 @@
+name: agenda
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pillow>=10
+  - ultralytics>=8.0  # YOLO 학습 (train_yolo.py)
+

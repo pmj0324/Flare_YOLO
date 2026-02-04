@@ -1,0 +1,26 @@
+<annotation>
+	<folder>reports</folder>
+	<filename>2259_001 - 0015.jpg</filename>
+	<path>C:\Users\tobi0\OneDrive\Desktop\랩실\flame ark\reports\2259_001 - 0015.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>2480</width>
+		<height>3506</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>row</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>120</xmin>
+			<ymin>89</ymin>
+			<xmax>2296</xmax>
+			<ymax>201</ymax>
+		</bndbox>
+	</object>
+</annotation>
