@@ -2,14 +2,14 @@
 """
 5. YOLO 모델 학습 및 성능지표 출력
 
-학습 설정 (Ultralytics 기본값, model.train()에서 변경 가능):
-  - Optimizer: SGD (momentum=0.937, weight_decay=0.0005)
-  - Learning rate: lr0=0.01, lrf=0.01 (최종 lr = lr0 * lrf)
-  - Scheduler: cosine LR (OneCycleLR 스타일)
-  - Early stopping: patience epoch 동안 val mAP 개선 없으면 학습 중단 (기본 50)
+학습 설정 (Ultralytics 기본값, config/CLI로 변경 가능):
+  - Optimizer: 기본 auto(=SGD). AdamW 쓰려면 config [Training] optimizer=AdamW, lr0=0.001 권장.
+  - SGD: momentum=0.937, lr0=0.01. Adam/AdamW: lr0=1e-3 권장.
+  - Scheduler: cosine LR. Early stopping: patience epoch.
 """
 import argparse
 import configparser
+import os
 from pathlib import Path
 
 try:
@@ -121,65 +121,112 @@ def main():
     p = argparse.ArgumentParser(description="YOLO 학습")
     p.add_argument("--config", type=Path, help="config.ini (선택)")
     p.add_argument("--data", type=Path, default=Path("datasets/yolo/data.yaml"))
-    p.add_argument("--weight", type=str, default="yolo8l.pt")
+    p.add_argument("--weight", type=str, default=None, help="사용할 모델 가중치 (config 없을 때만 필요)")
+    p.add_argument("--optimizer", type=str, default=None, help="SGD, Adam, AdamW, NAdam, RAdam, RMSProp, auto")
+    p.add_argument("--lr0", type=float, default=None, help="Initial LR (SGD 0.01, AdamW 0.001 권장)")
     p.add_argument("--epochs", type=int, default=100)
     p.add_argument("--patience", type=int, default=50, help="Early stopping: stop if no improvement for N epochs")
     p.add_argument("--imgsz", type=int, default=640)
     p.add_argument("--batch", type=int, default=16)
     p.add_argument("--device", type=str, default="0")
-    p.add_argument("--project", type=Path, default=Path("runs/detect"))
-    p.add_argument("--name", type=str, default="train")
-    p.add_argument("--metrics_file", type=Path, default=None, help="성능 지표 저장 txt 경로 (없으면 project/name/metrics.txt)")
-    p.add_argument("--val_vis_dir", type=Path, default=None, help="Val 실제vs예측 이미지 저장 폴더 (없으면 project/name/val_vis)")
+    p.add_argument("--output_dir", type=Path, default=None, help="아웃풋 저장 경로 (weights, metrics.txt, val_vis 모두 여기 아래)")
     args = p.parse_args()
 
+    # 실행 시 작업 디렉터리를 스크립트 기준 프로젝트 루트(Flare_YOLO)로 고정 → config·다운로드 경로 일치
+    project_root = Path(__file__).resolve().parent.parent
+    os.chdir(project_root)
+
+    # config 경로: 지정한 경로가 없거나 없으면 프로젝트 루트의 config.ini 사용
+    config_path = Path(args.config).resolve() if args.config else None
+    if not config_path or not config_path.exists():
+        config_path = Path(__file__).resolve().parent.parent / "config.ini"
     cfg = {}
-    if args.config and args.config.exists():
+    if config_path.exists():
         cp = configparser.ConfigParser()
-        cp.read(args.config, encoding="utf-8")
+        cp.read(config_path, encoding="utf-8")
         if cp.has_section("Model"):
-            cfg["weight"] = cp.get("Model", "weight", fallback="yolo8l.pt")
+            cfg["weight"] = cp.get("Model", "weight", fallback="yolo8l.pt").strip()
         if cp.has_section("Data"):
-            cfg["yaml_path"] = cp.get("Data", "yaml_path", fallback="")
+            cfg["yaml_path"] = cp.get("Data", "yaml_path", fallback="").strip()
         if cp.has_section("Training"):
+            cfg["optimizer"] = cp.get("Training", "optimizer", fallback="auto").strip()
+            cfg["lr0"] = cp.getfloat("Training", "lr0", fallback=0.01)
             cfg["epochs"] = cp.getint("Training", "epochs", fallback=100)
             cfg["patience"] = cp.getint("Training", "patience", fallback=50)
             cfg["imgsz"] = cp.getint("Training", "imgsz", fallback=640)
             cfg["batch"] = cp.getint("Training", "batch", fallback=16)
         if cp.has_section("Output"):
-            cfg["project"] = cp.get("Output", "project_path", fallback="runs/detect")
-            cfg["name"] = cp.get("Output", "run_name", fallback="train")
-            cfg["metrics_file"] = cp.get("Output", "metrics_file", fallback="").strip()
-            cfg["val_vis_dir"] = cp.get("Output", "val_vis_dir", fallback="").strip()
+            raw_out = cp.get("Output", "output_dir", fallback="").strip()
+            cfg["output_dir"] = str(Path(raw_out).resolve()) if raw_out else ""
 
     data = str(args.data or cfg.get("yaml_path", ""))
     if not data or not Path(data).exists():
         raise SystemExit("--data 또는 config yaml_path 필요")
 
+    # 아웃풋 저장 경로 하나 (CLI 우선, 없으면 config, 없으면 runs/detect/train)
+    output_dir = args.output_dir or cfg.get("output_dir") or "runs/detect/train"
+    output_dir = Path(output_dir).resolve()
+    # Ultralytics는 project/name 형태로 받으므로 분리
+    project = str(output_dir.parent)
+    name = output_dir.name
+    print(f"Config: {config_path}")
+    print(f"저장 경로: {output_dir}")
+
+    # 사용할 가중치: config 또는 CLI에 지정된 것만 사용. 없으면 에러 후 종료
+    weight = (args.weight or cfg.get("weight") or "").strip()
+    if not weight:
+        raise SystemExit(
+            "config에 weight가 없거나 입력이 잘못되었습니다. "
+            "사용할 모델 가중치를 config.ini [Model] weight= 또는 --weight 로 지정해 주세요."
+        )
+    print(f"사용할 가중치 (config/CLI): {weight}")
+
+    # 지정한 모델만 사용: 로컬에 있으면 그대로, 없으면 지정 이름으로만 다운로드 시도 (yolo8* → yolov8*.pt 변환)
+    weight_path = Path(weight)
+    if not weight_path.is_absolute():
+        weight_path = project_root / weight_path.name
+    if not weight_path.exists():
+        from ultralytics.utils.downloads import attempt_download_asset
+        download_name = weight.replace("yolo8", "yolov8", 1) if "yolo8" in weight and weight.endswith(".pt") else weight
+        try:
+            weight = attempt_download_asset(download_name)
+        except Exception as e:
+            raise SystemExit(
+                f"지정한 모델을 찾을 수 없고 다운로드에도 실패했습니다: {weight}\n  오류: {e}"
+            ) from e
+        if not weight or not Path(weight).exists():
+            raise SystemExit(
+                f"지정한 모델을 찾을 수 없고 다운로드에도 실패했습니다: {weight}"
+            )
+    else:
+        weight = str(weight_path)
+    print(f"모델 가중치 (로드): {weight}")
+
     from ultralytics import YOLO
-    model = YOLO(args.weight or cfg.get("weight", "yolo8l.pt"))
-    model.train(
+    model = YOLO(weight)
+    train_kw = dict(
         data=data,
         epochs=args.epochs or cfg.get("epochs", 100),
         patience=args.patience or cfg.get("patience", 50),
         imgsz=args.imgsz or cfg.get("imgsz", 640),
         batch=args.batch or cfg.get("batch", 16),
         device=args.device,
-        project=str(args.project or cfg.get("project", "runs/detect")),
-        name=args.name or cfg.get("name", "train"),
+        project=project,
+        name=name,
     )
+    opt = args.optimizer if args.optimizer is not None else cfg.get("optimizer")
+    if opt is not None:
+        train_kw["optimizer"] = opt
+    lr0 = args.lr0 if args.lr0 is not None else cfg.get("lr0")
+    if lr0 is not None:
+        train_kw["lr0"] = lr0
+    model.train(**train_kw)
 
-    project = str(args.project or cfg.get("project", "runs/detect"))
-    name = args.name or cfg.get("name", "train")
-    best = Path(project) / name / "weights" / "best.pt"
+    best = output_dir / "weights" / "best.pt"
     if best.exists():
         metrics = get_metrics(best, data)
-        metrics_file = args.metrics_file or cfg.get("metrics_file") or ""
-        metrics_file = Path(metrics_file) if str(metrics_file).strip() else Path(project) / name / "metrics.txt"
-        save_metrics_txt(metrics, metrics_file)
-        val_vis_dir = args.val_vis_dir or cfg.get("val_vis_dir") or ""
-        val_vis_dir = Path(val_vis_dir) if str(val_vis_dir).strip() else Path(project) / name / "val_vis"
-        draw_val_gt_vs_pred(str(best), data, val_vis_dir)
+        save_metrics_txt(metrics, output_dir / "metrics.txt")
+        draw_val_gt_vs_pred(str(best), data, output_dir / "val_vis")
     return 0
 
 

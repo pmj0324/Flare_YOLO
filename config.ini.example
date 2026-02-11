@@ -2,7 +2,10 @@
 ; 이 파일을 config.ini로 복사 후 경로를 수정하여 사용
 
 [Model]
-; 사용할 모델 가중치 (yolo8n, yolo8s, yolo8m, yolo8l, yolo8x, -seg 등)
+; 사용할 모델 가중치 (아래 사용법 참고. 지정한 이름만 다운로드/사용됨)
+; 8 시리즈: yolo8n, yolo8s, yolo8m, yolo8l, yolo8x (다운로드 시 yolov8*.pt 로 저장됨)
+; 11 시리즈: yolo11n, yolo11s, yolo11m, yolo11l, yolo11x
+; 12 시리즈: yolo12n~x  등
 weight = yolo8l.pt
 
 [Data]
@@ -10,6 +13,10 @@ weight = yolo8l.pt
 yaml_path = datasets/yolo/data.yaml
 
 [Training]
+; optimizer: SGD, Adam, AdamW, NAdam, RAdam, RMSProp, auto(기본=SGD)
+; AdamW 쓰면 lr0=0.001 권장 (SGD는 0.01)
+optimizer = auto
+lr0 = 0.01
 epochs = 100
 imgsz = 640
 batch = 16
@@ -21,6 +28,5 @@ device = 0
 workers = 8
 
 [Output]
-; 저장 경로: 아래 두 개만 쓰면 됨. 결과는 모두 {project_path}/{run_name}/ 아래에 저장됨
-project_path = runs/detect
-run_name = trained_model
+; 아웃풋 저장 경로 하나만 지정 (weights, metrics.txt, val_vis 등 모두 이 경로 아래에 저장)
+output_dir = runs/detect/yolo_8l
